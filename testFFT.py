@@ -1,4 +1,11 @@
 import numpy as np
+import numpy as np
+
+def equalize(signal, freq_start, freq_end, koef):
+
+    signal[freq_start:freq_end] *= koef  # Умножаем значения в заданном интервале на коэффициент
+    
+    return signal
 
 def zero_pad_to_power_of_two(signal):
     current_length = len(signal)
@@ -60,13 +67,17 @@ def IFFT(X):  # Обратное преобразование Фурье
 # Задаем входной сигнал (в данном примере синусоида с частотой 10 Гц)
 fs = 1000  # Частота дискретизации
 t = np.linspace(0, 1, fs)  # Временной промежуток 1 секунда
-signal = np.sin(2 * np.pi * 200 * t) + 1/2*np.sin(2 * np.pi * 100 * t)  # 10 Гц синусоида
+signal = np.sin(2 * np.pi * 10 * t) + np.sin(2 * np.pi * 100 * t) + np.sin(2 * np.pi * 150 * t)  + np.sin(2 * np.pi * 200 * t) + np.sin(2 * np.pi * 250 * t) + np.sin(2 * np.pi * 300 * t)
 
 # Преобразование Фурье
 fft_signal = np.fft.fft(signal)
 signal2 = zero_pad_to_power_of_two(signal)
 fft_signal2 = FFT(signal2)
-
+freq_start = 80
+freq_end = 400
+koef = 0.0
+fft_signal[freq_start:freq_end] *= koef
+fft_signal[fs-freq_end:fs-freq_start] *= koef
 N = len(signal)
 freqs = np.linspace(0, fs-1/fs, N)
 
