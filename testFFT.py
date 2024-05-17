@@ -4,17 +4,17 @@ import numpy as np
 fs = 1000  # Частота дискретизации
 t = np.linspace(0, 1, fs)  # Временной промежуток 1 секунда
 signal = np.sin(2 * np.pi * 20 * t) + 1/2*np.sin(2 * np.pi * 10 * t)  # 10 Гц синусоида
-
+N = len(signal)
 # Преобразование Фурье
 fft_signal = np.fft.fft(signal)
-
-freqs = np.fft.fftfreq(len(signal), 1/fs)
-
+print(len(fft_signal))
+freqs = np.linspace(0, fs-1/fs, N)
+print(len(freqs))
 # Обратное преобразование Фурье
 reconstructed_signal = np.fft.ifft(fft_signal)
 #print(np.abs(fft_signal))
 # Оставляем значения от нуля до частоты дискретизации
-fft_signal[int(fs/2):] = 0
+# fft_signal[int(fs/2):] = 0
 
 # Обратное преобразование Фурье для нового сигнала
 reconstructed_signal_filtered = np.fft.ifft(fft_signal)
