@@ -77,11 +77,11 @@ freq_start = 80
 freq_end = 400
 koef = 0.0
 fft_signal[freq_start:freq_end] *= koef
-fft_signal[fs-freq_end:fs-freq_start] *= koef
+# fft_signal[fs-freq_end:fs-freq_start] *= koef
 N = len(signal)
 freqs = np.linspace(0, fs-1/fs, N)
 
-reconstructed_signal = np.fft.ifft(fft_signal)
+reconstructed_signal = np.fft.ifft(fft_signal[:500])
 reconstructed_signal2 = IFFT(fft_signal2)
 
 print(len(reconstructed_signal))
@@ -102,7 +102,7 @@ plt.plot(np.abs(fft_signal2))
 plt.title('Спектр сигнала БПФ')
 
 plt.subplot(3, 2, 4)
-plt.plot(t, np.real(reconstructed_signal))
+plt.plot(np.real(reconstructed_signal))
 plt.title('Восстановленный сигнал библиотечная функция')
 
 plt.subplot(3, 2, 5)
