@@ -1,5 +1,4 @@
 import numpy as np
-import numpy as np
 
 def equalize(signal, freq_start, freq_end, koef):
 
