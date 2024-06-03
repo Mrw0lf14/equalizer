@@ -29,13 +29,8 @@ def plot_graph(freqs, fft_data):
 # Загрузка файла и вывод эквалайзера
 uploaded_file = st.file_uploader("Upload audio file", type=["wav"])
 
-st.button("Reset", type="primary")
-if st.button("Say hello"):
-    st.write("Why hello there")
-else:
-    st.write("Goodbye")
-
 if uploaded_file is not None:
+    st.audio(uploaded_file, format='audio/mp3')
     sample_rate, data = load_audio(uploaded_file)
     freqs = np.fft.fftfreq(len(data), 1/sample_rate)
     fft_data = fourier_transform(data)
