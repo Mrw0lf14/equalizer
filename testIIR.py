@@ -1,5 +1,7 @@
 import scipy.signal
 import soundfile as sf
+import numpy as np
+import matplotlib.pyplot as plt
 
 # Коэффициенты фильтрации
 numerator = [0.000000000651703380907738176811535387898,
@@ -27,10 +29,20 @@ denominator = [1,
                0.676107542901690727887853427091613411903]
 
 # Чтение аудиофайла
-audio_data, sample_rate = sf.read("input_audio.wav")
+audio_data, sample_rate = sf.read("uwu.wav")
 
 # Применение фильтра
 filtered_audio = scipy.signal.lfilter(numerator, denominator, audio_data)
 
 # Сохранение результата в аудиофайл
 sf.write("output_audio.wav", filtered_audio, sample_rate)
+fft_signal = np.fft.fft(audio_data)
+plt.subplot(2, 1, 1)
+plt.plot(np.abs(fft_signal))
+plt.title('Входной сигнал')
+
+fft_signal = np.fft.fft(filtered_audio)
+plt.subplot(2, 1, 2)
+plt.plot(np.abs(fft_signal))
+plt.title('Спектр сигнала библиотечная функция')
+plt.show()
