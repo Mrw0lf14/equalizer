@@ -1,9 +1,12 @@
 import numpy as np
+from scipy.io import wavfile
+import matplotlib.pyplot as plt
 
 def equalize(signal, freq_start, freq_end, koef):
-
     signal[freq_start:freq_end] *= koef  # Умножаем значения в заданном интервале на коэффициент
-    
+    sample_rate = len(signal)
+    print(sample_rate)
+    signal[sample_rate-freq_end:sample_rate-freq_start] *= koef
     return signal
 
 def zero_pad_to_power_of_two(signal):
@@ -62,51 +65,100 @@ def IFFT(X):  # Обратное преобразование Фурье
         factor = np.exp(2j * np.pi * np.arange(N) / N)
         return np.concatenate([X_even + factor[:N // 2] * X_odd,
                                X_even + factor[N // 2:] * X_odd])
+        
+# Функция для преобразования Фурье каждого канала
+def fourier_transform(audio_data):
+    print("Прямое преобразование Фурье")
+    num_channels = audio_data.shape[1]
+    transformed_data = []
+    packet_size = 8192
+    
+    for i in range(num_channels):
+        channel_transformed = []
+        channel_data = audio_data[:, i]  # Выбираем i-ый канал
+        for i in range(0, len(channel_data), packet_size):
+            signal_packets = channel_data[i:i+packet_size]
+            signal_size = len(signal_packets)
+            if (signal_size < packet_size):
+                # signal_packets = zero_pad_to_power_of_two(signal_packets)
+                pad_length = packet_size - len(signal_packets)
+                signal_packets = np.pad(signal_packets, (0, pad_length), mode='constant')  # Дополняем нулями
+            channel_fft = FFT(signal_packets)  # Преобразование Фурье
+            equalize(channel_fft, 500, 5000, 0.1)
+            channel_ifft = IFFT(channel_fft)
+            channel_transformed.extend(channel_ifft.tolist())
+        transformed_data.append(channel_transformed)
+    return np.array(transformed_data).T
 
-# Задаем входной сигнал (в данном примере синусоида с частотой 10 Гц)
-fs = 1000  # Частота дискретизации
-t = np.linspace(0, 1, fs)  # Временной промежуток 1 секунда
-signal = np.sin(2 * np.pi * 10 * t) + np.sin(2 * np.pi * 100 * t) + np.sin(2 * np.pi * 150 * t)  + np.sin(2 * np.pi * 200 * t) + np.sin(2 * np.pi * 250 * t) + np.sin(2 * np.pi * 300 * t)
+# # Задаем входной сигнал (в данном примере синусоида с частотой 10 Гц)
+# fs = 1000  # Частота дискретизации
+# t = np.linspace(0, 1, fs)  # Временной промежуток 1 секунда
+# signal = np.sin(2 * np.pi * 10 * t) + np.sin(2 * np.pi * 100 * t) + np.sin(2 * np.pi * 150 * t)  + np.sin(2 * np.pi * 200 * t) + np.sin(2 * np.pi * 250 * t) + np.sin(2 * np.pi * 300 * t)
 
-# Преобразование Фурье
-fft_signal = np.fft.fft(signal)
-signal2 = zero_pad_to_power_of_two(signal)
-fft_signal2 = FFT(signal2)
-freq_start = 80
-freq_end = 400
-koef = 0.0
-fft_signal[freq_start:freq_end] *= koef
-# fft_signal[fs-freq_end:fs-freq_start] *= koef
-N = len(signal)
-freqs = np.linspace(0, fs-1/fs, N)
+# # Преобразование Фурье
+# fft_signal = np.fft.fft(signal)
+# signal2 = zero_pad_to_power_of_two(signal)
+# fft_signal2 = FFT(signal2)
+# freq_start = 80
+# freq_end = 400
+# koef = 0.0
+# fft_signal[freq_start:freq_end] *= koef
+# # fft_signal[fs-freq_end:fs-freq_start] *= koef
+# N = len(signal)
+# freqs = np.linspace(0, fs-1/fs, N)
 
-reconstructed_signal = np.fft.ifft(fft_signal[:500])
-reconstructed_signal2 = IFFT(fft_signal2)
+# reconstructed_signal = np.fft.ifft(fft_signal)
+# reconstructed_signal2 = IFFT(fft_signal2)
 
-print(len(reconstructed_signal))
-print(len(reconstructed_signal2))
+sample_rate, audio_data = wavfile.read('uwu.wav')
 
-import matplotlib.pyplot as plt
+# Проверяем, если аудиофайл имеет несколько каналов, разделяем на каналы
+if audio_data.ndim > 1:
+    transformed_data = fourier_transform(audio_data)
+    plt.figure()
+    plt.subplot(2, 1, 1)
+    plt.plot(audio_data)
+    plt.title('Входной сигнал')
+    plt.subplot(2, 1, 2)
+    plt.plot(transformed_data)
+    plt.title('Выходной сигнал')
 
-plt.subplot(3, 2, 1)
-plt.plot(t, signal)
-plt.title('Входной сигнал')
+    plt.figure()
+    fft_signal = np.fft.fft(audio_data)
+    plt.subplot(2, 1, 1)
+    plt.plot(np.abs(fft_signal))
+    plt.title('Входной сигнал')
+    fft_signal = np.fft.fft(transformed_data)
+    plt.subplot(2, 1, 2)
+    plt.plot(np.abs(fft_signal))
+    plt.title('Выходной сигнал')
+    # inverse_result = inverse_fourier_transform(transformed_data)
+    # Сохраняем результат обратного преобразования в файл 'out.wav'
+    wavfile.write('out.wav', sample_rate, transformed_data.astype(np.int32))
+    print("Результат обратного преобразования сохранен в файл 'out.wav'.")
+else:
+    print("Аудиофайл имеет только один канал.")
 
-plt.subplot(3, 2, 2)
-plt.plot(np.abs(fft_signal))
-plt.title('Спектр сигнала библиотечная функция')
+# plt.figure()
+# plt.subplot(3, 2, 1)
+# plt.plot(t, signal)
+# plt.title('Входной сигнал')
 
-plt.subplot(3, 2, 3)
-plt.plot(np.abs(fft_signal2))
-plt.title('Спектр сигнала БПФ')
+# plt.subplot(3, 2, 2)
+# plt.plot(np.abs(fft_signal))
+# plt.title('Спектр сигнала библиотечная функция')
 
-plt.subplot(3, 2, 4)
-plt.plot(np.real(reconstructed_signal))
-plt.title('Восстановленный сигнал библиотечная функция')
+# plt.subplot(3, 2, 3)
+# plt.plot(np.abs(fft_signal2))
+# plt.title('Спектр сигнала БПФ')
 
-plt.subplot(3, 2, 5)
-plt.plot(np.real(reconstructed_signal2))
-plt.title('Восстановленный сигнал БОПФ')
+# plt.subplot(3, 2, 4)
+# plt.plot(np.real(reconstructed_signal))
+# plt.title('Восстановленный сигнал библиотечная функция')
 
-plt.tight_layout()
+# plt.subplot(3, 2, 5)
+# plt.plot(np.real(reconstructed_signal2))
+# plt.title('Восстановленный сигнал БОПФ')
+
+# plt.tight_layout()
 plt.show()
