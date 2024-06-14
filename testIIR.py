@@ -35,7 +35,7 @@ audio_data, sample_rate = sf.read("uwu.wav")
 filtered_audio = scipy.signal.lfilter(numerator, denominator, audio_data)
 
 # Сохранение результата в аудиофайл
-sf.write("output_audio.wav", filtered_audio, sample_rate)
+sf.write("output_audio.wav", filtered_audio*100000, sample_rate)
 fft_signal = np.fft.fft(audio_data)
 plt.subplot(2, 1, 1)
 plt.plot(np.abs(fft_signal))
