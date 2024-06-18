@@ -2,11 +2,23 @@ import numpy as np
 from scipy.io import wavfile
 import matplotlib.pyplot as plt
 
-def equalize(signal, freq_start, freq_end, koef):
-    signal[freq_start:freq_end] *= koef  # Умножаем значения в заданном интервале на коэффициент
+def equalize(signal, start, end, koef):
+    if (start == 0):
+        window_length = (end - start)*2
+        window = 1 + koef * np.hamming(window_length)
+        window = window[0:(end - start)]
+    else:
+        window_length = (end - start)
+        window = 1 + koef * np.hamming(window_length)
+        window = window[0:(end - start)]
+    plt.subplot(3, 1, 1)
+    plt.plot(window*1000)
+    signal[start:end] *= window
     sample_rate = len(signal)
-    print(sample_rate)
-    signal[sample_rate-freq_end:sample_rate-freq_start] *= koef
+    signal[sample_rate-end:sample_rate-start] *= window[::-1]
+    # signal[start:end] *= koef
+    # sample_rate = len(signal)
+    # signal[sample_rate-end:sample_rate-start] *= koef
     return signal
 
 def zero_pad_to_power_of_two(signal):
@@ -65,13 +77,21 @@ def IFFT(X):  # Обратное преобразование Фурье
         factor = np.exp(2j * np.pi * np.arange(N) / N)
         return np.concatenate([X_even + factor[:N // 2] * X_odd,
                                X_even + factor[N // 2:] * X_odd])
-        
+
+def limitfunction(func, maxvalue):
+    def limitedfunc(x):
+        result = func(x)
+        if result > maxvalue:
+            return maxvalue
+        else:
+            return result
+    return limitedfunc        
 # Функция для преобразования Фурье каждого канала
 def fourier_transform(audio_data):
     print("Прямое преобразование Фурье")
     num_channels = audio_data.shape[1]
     transformed_data = []
-    packet_size = 8192
+    packet_size = 16384
     
     for i in range(num_channels):
         channel_transformed = []
@@ -80,16 +100,69 @@ def fourier_transform(audio_data):
             signal_packets = channel_data[i:i+packet_size]
             signal_size = len(signal_packets)
             if (signal_size < packet_size):
-                # signal_packets = zero_pad_to_power_of_two(signal_packets)
                 pad_length = packet_size - len(signal_packets)
                 signal_packets = np.pad(signal_packets, (0, pad_length), mode='constant')  # Дополняем нулями
             channel_fft = FFT(signal_packets)  # Преобразование Фурье
-            equalize(channel_fft, 500, 5000, 0.1)
+            equalize(channel_fft, 100, 1000, 2)
             channel_ifft = IFFT(channel_fft)
+            channel_ifft[0:10] /= 100
+            channel_ifft[packet_size-10:packet_size] /= 100
             channel_transformed.extend(channel_ifft.tolist())
-        transformed_data.append(channel_transformed)
+        transformed_data.append(np.real(channel_transformed)*2)
     return np.array(transformed_data).T
 
+def limitchannelifft(channelifft, maxvalue):
+    def limitedchannelifft(values):
+        result = channelifft(values)
+        for val in result:
+            limitedresult = min(val, max_value) 
+        return limitedresult
+    return limitedchannelifft
+
+def fourier_transform_mono(audio_data):
+    print("Прямое преобразование Фурье")
+    packet_size = 32768
+    # 32768 16384 8192
+    channel_transformed = []
+    channel_data = audio_data
+    for i in range(0, len(channel_data), packet_size):
+
+        signal_packets = channel_data[i:i+packet_size]
+        signal_size = len(signal_packets)
+        if (signal_size < packet_size):
+            pad_length = packet_size - len(signal_packets)
+            signal_packets = np.pad(signal_packets, (0, pad_length), mode='constant')  # Дополняем нулями
+        channel_fft = FFT(signal_packets)  # Преобразование Фурье
+        plt.figure()
+        plt.subplot(3, 1, 1)
+        plt.plot(np.abs(channel_fft))
+        plt.title('ДПФ')
+        equalize(channel_fft, 10, 1000, -0.9)
+
+        plt.subplot(3, 1, 2)
+        plt.plot(np.abs(channel_fft))
+        plt.title('ДПФ')
+        channel_ifft = IFFT(channel_fft)
+        # channel_ifft[0:10] /= 100
+        # channel_ifft[packet_size-10:packet_size] /= 100
+        plt.subplot(3, 1, 3)
+        plt.plot(np.real(channel_ifft))
+        plt.title('Выходной сигнал')
+        channel_transformed.extend(channel_ifft.tolist())
+    return np.array(channel_transformed).T
+
+def normalize_signal(signal):
+    max_value = np.max(signal)
+    print("normilezed:", max_value)
+    normalized_signal = signal / max_value
+    print("after normilezed:", np.max(normalized_signal))
+    return max_value, normalized_signal
+
+def denormalize_signal(signal, max_value):
+    print("denormilezed:", np.max(signal))
+    denormalized_signal = signal * max_value
+    print("after denormilezed:", np.max(denormalized_signal))
+    return denormalized_signal
 # # Задаем входной сигнал (в данном примере синусоида с частотой 10 Гц)
 # fs = 1000  # Частота дискретизации
 # t = np.linspace(0, 1, fs)  # Временной промежуток 1 секунда
@@ -110,35 +183,43 @@ def fourier_transform(audio_data):
 # reconstructed_signal = np.fft.ifft(fft_signal)
 # reconstructed_signal2 = IFFT(fft_signal2)
 
-sample_rate, audio_data = wavfile.read('uwu.wav')
-
+sample_rate, audio_data = wavfile.read('in.wav')
+max_value, signal = normalize_signal(audio_data)
+print("proof normalized signal:", np.max(signal))
 # Проверяем, если аудиофайл имеет несколько каналов, разделяем на каналы
 if audio_data.ndim > 1:
-    transformed_data = fourier_transform(audio_data)
-    plt.figure()
-    plt.subplot(2, 1, 1)
-    plt.plot(audio_data)
-    plt.title('Входной сигнал')
-    plt.subplot(2, 1, 2)
-    plt.plot(transformed_data)
-    plt.title('Выходной сигнал')
-
-    plt.figure()
-    fft_signal = np.fft.fft(audio_data)
-    plt.subplot(2, 1, 1)
-    plt.plot(np.abs(fft_signal))
-    plt.title('Входной сигнал')
-    fft_signal = np.fft.fft(transformed_data)
-    plt.subplot(2, 1, 2)
-    plt.plot(np.abs(fft_signal))
-    plt.title('Выходной сигнал')
-    # inverse_result = inverse_fourier_transform(transformed_data)
-    # Сохраняем результат обратного преобразования в файл 'out.wav'
-    wavfile.write('out.wav', sample_rate, transformed_data.astype(np.int32))
-    print("Результат обратного преобразования сохранен в файл 'out.wav'.")
+    transformed_data = fourier_transform(signal)
+    temp, transformed_data = normalize_signal(transformed_data)
+    print("proof normalized fft:", np.max(transformed_data))
 else:
     print("Аудиофайл имеет только один канал.")
+    transformed_data = fourier_transform_mono(signal)
+    temp, transformed_data = normalize_signal(transformed_data)
+    
+out_data = denormalize_signal(np.real(transformed_data), max_value)
 
+print("proof denormalized:", np.max(out_data))
+plt.figure()
+plt.subplot(2, 1, 1)
+plt.plot(audio_data)
+plt.title('Входной сигнал')
+plt.subplot(2, 1, 2)
+plt.plot(out_data)
+plt.title('Выходной сигнал')
+
+plt.figure()
+fft_signal = np.fft.fft(audio_data)
+plt.subplot(2, 1, 1)
+plt.plot(np.abs(fft_signal))
+plt.title('Входной сигнал')
+fft_signal = np.fft.fft(out_data)
+plt.subplot(2, 1, 2)
+plt.plot(np.abs(fft_signal))
+plt.title('Выходной сигнал')
+# inverse_result = inverse_fourier_transform(transformed_data)
+# Сохраняем результат обратного преобразования в файл 'out.wav'
+wavfile.write('out.wav', sample_rate, out_data.astype(np.int16))
+print("Результат обратного преобразования сохранен в файл 'out.wav'.")
 # plt.figure()
 # plt.subplot(3, 2, 1)
 # plt.plot(t, signal)
