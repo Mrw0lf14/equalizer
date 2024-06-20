@@ -9,14 +9,6 @@ def equalize(signal, start_f, end_f, koef):
     start = int(np.round(start_f / 44100 * sample_rate))
     end = int(np.round(end_f / 44100 * sample_rate))
 
-    # if start >= end:
-    #     raise ValueError("End frequency must be greater than start frequency.")
-
-    # window_length = end - start
-    # window = 1 + koef * np.hamming(window_length)
-
-    # signal[start:end] *= window
-    # signal[sample_rate - end:sample_rate - start] *= window[::-1]
     signal[start:end] *= 1 + koef
     sample_rate = len(signal)
     signal[sample_rate-end:sample_rate-start] *= 1 + koef
@@ -44,10 +36,7 @@ def IDFT_slow(X):
 def FFT(x):
     x = np.asarray(x, dtype=float)
     N = x.shape[0]
-    
-    if N % 2 > 0:
-        raise ValueError("size of x must be a power of 2")
-    elif N <= 32:  # this cutoff should be optimized
+    if N <= 32:  # this cutoff should be optimized
         return DFT_slow(x)
     else:
         X_even = FFT(x[::2])
@@ -60,10 +49,7 @@ def FFT(x):
 def IFFT(X):  
     X = np.asarray(X, dtype=complex)
     N = X.shape[0]
-    
-    if N % 2 > 0:
-        raise ValueError("size of X must be a power of 2")
-    elif N <= 32:  # this cutoff should be optimized
+    if N <= 32:  # this cutoff should be optimized
         return IDFT_slow(X)
     else:
         X_even = IFFT(X[::2])
@@ -71,21 +57,6 @@ def IFFT(X):
         factor = np.exp(2j * np.pi * np.arange(N) / N)
         return np.concatenate([X_even + factor[:N // 2] * X_odd,
                                X_even + factor[N // 2:] * X_odd])
-
-def apply_window(signal, window_size, overlap):
-    step = window_size - overlap
-    window = np.hanning(window_size)
-    result = np.zeros_like(signal)
-    window_sum = np.zeros_like(signal)
-    
-    for i in range(0, len(signal) - window_size + 1, step):
-        result[i:i+window_size] += signal[i:i+window_size] * window
-        window_sum[i:i+window_size] += window
-    
-    nonzero_indices = window_sum != 0
-    result[nonzero_indices] /= window_sum[nonzero_indices]
-    
-    return result
 
 # Функция для преобразования Фурье каждого канала
 def fourier_transform(audio_data, slider_values):
