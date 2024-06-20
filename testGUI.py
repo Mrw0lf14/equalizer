@@ -103,7 +103,7 @@ def denormalize_signal(signal, max_value):
     return denormalized_signal
 
 # Отображение графика
-def plot_graph(data):
+def plot_fft(data):
     fft_data = np.fft.fft(data)
     fft_data = np.abs(fft_data) / len(fft_data)
     st.set_option('deprecation.showPyplotGlobalUse', False)
@@ -114,7 +114,14 @@ def plot_graph(data):
     plt.title('Fourier Transform of Audio Signal')
     plt.grid()
     st.pyplot()
-
+    
+def plot_raw(data):
+    st.set_option('deprecation.showPyplotGlobalUse', False)
+    plt.figure(figsize=(12, 6))
+    plt.plot(data)
+    plt.grid()
+    st.pyplot()
+    
 # Загрузка файла и вывод эквалайзера
 uploaded_file = st.file_uploader("Upload audio file", type=["wav"])
 
@@ -127,7 +134,7 @@ if uploaded_file is not None:
     # Создание слайдеров для эквалайзера
     slider_values = []
     for i in range(6):
-        slider_value = st.sidebar.slider(f"Полоса {i+1}", -1.0, 2.0, step=0.01)
+        slider_value = st.sidebar.slider(f"Полоса {i*3000} - {(i+1)*3000}", -1.0, 2.0, step=0.01)
         slider_values.append(slider_value)
 
     transformed_signal = fourier_transform(signal, slider_values)
@@ -138,10 +145,15 @@ if uploaded_file is not None:
 
     st.audio(out_file, format='audio/wav')
 
+    st.set_option('deprecation.showPyplotGlobalUse', False)
+    st.write("Исходный сигнал")
+    plot_raw(audio_data)
+    st.write("Выходной сигнал")
+    plot_raw(out_data)
     st.write("АЧХ исходного сигнала:")
-    plot_graph(audio_data)
+    plot_fft(audio_data)
     st.write("АЧХ измененного сигнала:")
-    plot_graph(out_data)
+    plot_fft(out_data)
 
 # Запуск Streamlit приложения
 if __name__ == "__main__":
