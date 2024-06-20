@@ -133,8 +133,9 @@ if uploaded_file is not None:
     transformed_signal = fourier_transform(signal, slider_values)
     temp, transformed_signal = normalize_signal(transformed_signal)
     out_data = denormalize_signal(np.real(transformed_signal), max_value)
-    wavfile.write('out.wav', sample_rate, out_data.astype(np.int16))
-    out_file = "out.wav"
+    out_file = "out_" + uploaded_file.name
+    wavfile.write(out_file, sample_rate, out_data.astype(np.int16))
+
     st.audio(out_file, format='audio/wav')
 
     st.write("АЧХ исходного сигнала:")
