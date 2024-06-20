@@ -2,7 +2,10 @@ import numpy as np
 from scipy.io import wavfile
 import matplotlib.pyplot as plt
 
-def equalize(signal, start, end, koef):
+def equalize(signal, start_f, end_f, koef):
+    sample_rate = len(signal)
+    start = int(np.round(start_f / 44100 * sample_rate))
+    end = int(np.round(end_f / 44100 * sample_rate))
     if (start == 0):
         window_length = (end - start)*2
         window = 1 + koef * np.hamming(window_length)
@@ -77,15 +80,6 @@ def IFFT(X):  # Обратное преобразование Фурье
         factor = np.exp(2j * np.pi * np.arange(N) / N)
         return np.concatenate([X_even + factor[:N // 2] * X_odd,
                                X_even + factor[N // 2:] * X_odd])
-
-def limitfunction(func, maxvalue):
-    def limitedfunc(x):
-        result = func(x)
-        if result > maxvalue:
-            return maxvalue
-        else:
-            return result
-    return limitedfunc        
 # Функция для преобразования Фурье каждого канала
 def fourier_transform(audio_data):
     print("Прямое преобразование Фурье")
@@ -110,6 +104,57 @@ def fourier_transform(audio_data):
             channel_transformed.extend(channel_ifft.tolist())
         transformed_data.append(np.real(channel_transformed)*2)
     return np.array(transformed_data).T
+
+
+def apply_window(signal, window_size, overlap):
+    step = window_size - overlap
+    window = np.hanning(window_size)
+    result = np.zeros_like(signal)
+    window_sum = np.zeros_like(signal)
+    
+    for i in range(0, len(signal) - window_size + 1, step):
+        result[i:i+window_size] += signal[i:i+window_size] * window
+        window_sum[i:i+window_size] += window
+    
+    nonzero_indices = window_sum != 0
+    result[nonzero_indices] /= window_sum[nonzero_indices]
+    
+    return result       
+    
+def fourier_transform2(audio_data, slider_values):
+    num_channels = audio_data.shape[1] if audio_data.ndim > 1 else 1
+    transformed_data = []
+    packet_size = 32768
+    overlap = packet_size // 2
+    
+    for channel in range(num_channels):
+        channel_data = audio_data[:, channel] if num_channels > 1 else audio_data
+        transformed_channel = np.zeros_like(channel_data, dtype=np.float32)
+        
+        for start in range(0, len(channel_data) - packet_size + 1, overlap):
+            signal_packet = channel_data[start:start+packet_size]
+            signal_packet = signal_packet.copy()  # Ensure the array is writable
+            
+            windowed_packet = signal_packet * np.hanning(packet_size)
+            channel_fft = FFT(windowed_packet)
+            
+            equalize(channel_fft, 0, 2000, slider_values[0])
+            equalize(channel_fft, 2000, 4000, slider_values[1])
+            equalize(channel_fft, 4000, 6000, slider_values[2])
+            equalize(channel_fft, 6000, 8000, slider_values[3])
+            equalize(channel_fft, 8000, 10000, slider_values[4])
+            equalize(channel_fft, 10000, 12000, slider_values[5])
+            
+            ifft_result = IFFT(channel_fft).real
+            transformed_channel[start:start+packet_size] += ifft_result * np.hanning(packet_size)
+        
+        transformed_data.append(transformed_channel)
+    
+    if num_channels > 1:
+        return np.array(transformed_data).T
+    else:
+        return np.array(transformed_data).flatten()
+
 
 def limitchannelifft(channelifft, maxvalue):
     def limitedchannelifft(values):
@@ -137,7 +182,12 @@ def fourier_transform_mono(audio_data):
         plt.subplot(3, 1, 1)
         plt.plot(np.abs(channel_fft))
         plt.title('ДПФ')
-        equalize(channel_fft, 10, 1000, -0.9)
+        equalize(channel_fft, 0, 2000, -0.5)
+        equalize(channel_fft, 2000, 4000, 1)
+        equalize(channel_fft, 4000, 6000, 0)
+        equalize(channel_fft, 6000, 8000, -0.5)
+        equalize(channel_fft, 8000, 10000, 2)
+        equalize(channel_fft, 10000, 12000, 1)
 
         plt.subplot(3, 1, 2)
         plt.plot(np.abs(channel_fft))
@@ -188,12 +238,12 @@ max_value, signal = normalize_signal(audio_data)
 print("proof normalized signal:", np.max(signal))
 # Проверяем, если аудиофайл имеет несколько каналов, разделяем на каналы
 if audio_data.ndim > 1:
-    transformed_data = fourier_transform(signal)
+    transformed_data = fourier_transform2(signal, [-0.9, -1, 0.5, -1, 2, 0])
     temp, transformed_data = normalize_signal(transformed_data)
     print("proof normalized fft:", np.max(transformed_data))
 else:
     print("Аудиофайл имеет только один канал.")
-    transformed_data = fourier_transform_mono(signal)
+    transformed_data = fourier_transform2(signal, [-0.9, -1, 0.5, -1, 2, 0])
     temp, transformed_data = normalize_signal(transformed_data)
     
 out_data = denormalize_signal(np.real(transformed_data), max_value)

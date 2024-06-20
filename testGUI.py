@@ -2,7 +2,6 @@ import streamlit as st
 from scipy.io import wavfile
 import numpy as np
 import matplotlib.pyplot as plt
-import array 
 
 # Эквализация одной полосы
 def equalize(signal, start_f, end_f, koef):
@@ -16,9 +15,6 @@ def equalize(signal, start_f, end_f, koef):
     window_length = end - start
     window = 1 + koef * np.hamming(window_length)
 
-    plt.subplot(3, 1, 1)
-    plt.plot(window * 1000)
-
     signal[start:end] *= window
     signal[sample_rate - end:sample_rate - start] *= window[::-1]
 
@@ -26,7 +22,6 @@ def equalize(signal, start_f, end_f, koef):
 
 # Прямое преобразование Фурье
 def DFT_slow(x):
-    """Compute the discrete Fourier Transform of the 1D array x"""
     x = np.asarray(x, dtype=float)
     N = x.shape[0]
     n = np.arange(N)
@@ -36,7 +31,6 @@ def DFT_slow(x):
 
 # Обратное преобразование Фурье
 def IDFT_slow(X):
-    """Compute the Inverse Discrete Fourier Transform of the 1D array X"""
     X = np.asarray(X, dtype=complex)
     N = X.shape[0]
     n = np.arange(N)
@@ -62,7 +56,6 @@ def FFT(x):
 
 # Обратное быстрое преобразование Фурье
 def IFFT(X):  
-    """A recursive implementation of the 1D Cooley-Tukey IFFT"""
     X = np.asarray(X, dtype=complex)
     N = X.shape[0]
     
@@ -76,69 +69,64 @@ def IFFT(X):
         factor = np.exp(2j * np.pi * np.arange(N) / N)
         return np.concatenate([X_even + factor[:N // 2] * X_odd,
                                X_even + factor[N // 2:] * X_odd])
-        
+
+def apply_window(signal, window_size, overlap):
+    step = window_size - overlap
+    window = np.hanning(window_size)
+    result = np.zeros_like(signal)
+    window_sum = np.zeros_like(signal)
+    
+    for i in range(0, len(signal) - window_size + 1, step):
+        result[i:i+window_size] += signal[i:i+window_size] * window
+        window_sum[i:i+window_size] += window
+    
+    nonzero_indices = window_sum != 0
+    result[nonzero_indices] /= window_sum[nonzero_indices]
+    
+    return result
+
 # Функция для преобразования Фурье каждого канала
 def fourier_transform(audio_data, slider_values):
-    num_channels = audio_data.shape[1]
+    num_channels = audio_data.shape[1] if audio_data.ndim > 1 else 1
     transformed_data = []
     packet_size = 16384
+    overlap = packet_size // 2
     
-    for i in range(num_channels):
-        channel_transformed = []
-        channel_data = audio_data[:, i]  # Выбираем i-ый канал
-        for i in range(0, len(channel_data), packet_size):
-            signal_packets = channel_data[i:i+packet_size]
-            signal_size = len(signal_packets)
-            if (signal_size < packet_size):
-                # signal_packets = zero_pad_to_power_of_two(signal_packets)
-                pad_length = packet_size - len(signal_packets)
-                signal_packets = np.pad(signal_packets, (0, pad_length), mode='constant')  # Дополняем нулями
-            channel_fft = FFT(signal_packets)  # Преобразование Фурье
+    for channel in range(num_channels):
+        channel_data = audio_data[:, channel] if num_channels > 1 else audio_data
+        transformed_channel = np.zeros_like(channel_data, dtype=np.float32)
+        
+        for start in range(0, len(channel_data) - packet_size + 1, overlap):
+            signal_packet = channel_data[start:start+packet_size]
+            signal_packet = signal_packet.copy()  # Ensure the array is writable
+            
+            windowed_packet = signal_packet * np.hanning(packet_size)
+            channel_fft = FFT(windowed_packet)
+            
             equalize(channel_fft, 0, 2000, slider_values[0])
             equalize(channel_fft, 2000, 4000, slider_values[1])
             equalize(channel_fft, 4000, 6000, slider_values[2])
             equalize(channel_fft, 6000, 8000, slider_values[3])
             equalize(channel_fft, 8000, 10000, slider_values[4])
             equalize(channel_fft, 10000, 12000, slider_values[5])
-            channel_ifft = IFFT(channel_fft)
-            channel_transformed.extend(channel_ifft.tolist())
-        transformed_data.append(channel_transformed)
-    return np.array(transformed_data).T
-
-def fourier_transform_mono(audio_data, slider_values):
-    print("Прямое преобразование Фурье")
-    packet_size = 32768
-    # 32768 16384 8192
-    channel_transformed = []
-    channel_data = audio_data
-    for i in range(0, len(channel_data), packet_size):
-        signal_packets = channel_data[i:i+packet_size]
-        signal_size = len(signal_packets)
-        if (signal_size < packet_size):
-            pad_length = packet_size - len(signal_packets)
-            signal_packets = np.pad(signal_packets, (0, pad_length), mode='constant')  # Дополняем нулями
-        channel_fft = FFT(signal_packets)  # Преобразование Фурье
-        equalize(channel_fft, 0, 2000, slider_values[0])
-        equalize(channel_fft, 2000, 4000, slider_values[1])
-        equalize(channel_fft, 4000, 6000, slider_values[2])
-        equalize(channel_fft, 6000, 8000, slider_values[3])
-        equalize(channel_fft, 8000, 10000, slider_values[4])
-        equalize(channel_fft, 10000, 12000, slider_values[5])
-        channel_ifft = IFFT(channel_fft)
-        channel_transformed.extend(channel_ifft.tolist())
-    return np.array(channel_transformed).T
+            
+            ifft_result = IFFT(channel_fft).real
+            transformed_channel[start:start+packet_size] += ifft_result * np.hanning(packet_size)
+        
+        transformed_data.append(transformed_channel)
+    
+    if num_channels > 1:
+        return np.array(transformed_data).T
+    else:
+        return np.array(transformed_data).flatten()
 
 def normalize_signal(signal):
-    max_value = np.max(signal)
-    print("normilezed:", max_value)
+    max_value = np.max(np.abs(signal))
     normalized_signal = signal / max_value
-    print("after normilezed:", np.max(normalized_signal))
     return max_value, normalized_signal
 
 def denormalize_signal(signal, max_value):
-    print("denormilezed:", np.max(signal))
     denormalized_signal = signal * max_value
-    print("after denormilezed:", np.max(denormalized_signal))
     return denormalized_signal
 
 # Отображение графика
@@ -153,44 +141,34 @@ def plot_graph(data):
     plt.title('Fourier Transform of Audio Signal')
     plt.grid()
     st.pyplot()
-   
+
 # Загрузка файла и вывод эквалайзера
 uploaded_file = st.file_uploader("Upload audio file", type=["wav"])
 
 if uploaded_file is not None:
     st.write("Проиграть исходное аудио:")
-    st.audio(uploaded_file, format='audio/mp3')
+    st.audio(uploaded_file, format='audio/wav')
     sample_rate, audio_data = wavfile.read(uploaded_file)
     max_value, signal = normalize_signal(audio_data)
     st.header("Эквалайзер")
     # Создание слайдеров для эквалайзера
     slider_values = []
     for i in range(6):
-        # st.sidebar.write(f'Band {i+1}')
         slider_value = st.sidebar.slider(f"Полоса {i+1}", -1.0, 2.0, step=0.01)
         slider_values.append(slider_value)
-        # st.write(slider_values)
-    if audio_data.ndim > 1:
-        transformed_signal = fourier_transform(signal, slider_values)
-        temp, transformed_signal = normalize_signal(transformed_signal)
-        print("proof normalized fft:", np.max(transformed_signal))
-    else:
-        print("Аудиофайл имеет только один канал.")
-        transformed_signal = fourier_transform_mono(signal, slider_values)
-        temp, transformed_signal = normalize_signal(transformed_signal)
-    # transformed_signal = fourier_transform(signal, slider_values)
-    # temp, transformed_signal = normalize_signal(transformed_signal)
+
+    transformed_signal = fourier_transform(signal, slider_values)
+    temp, transformed_signal = normalize_signal(transformed_signal)
     out_data = denormalize_signal(np.real(transformed_signal), max_value)
     wavfile.write('out.wav', sample_rate, out_data.astype(np.int16))
     out_file = "out.wav"
-    fft_signal = np.fft.fft(audio_data)
-    st.audio(out_file, format='audio/mp3')
+    st.audio(out_file, format='audio/wav')
+
     st.write("АЧХ исходного сигнала:")
-    plot_graph(np.abs(fft_signal))
-    fft_signal = np.fft.fft(out_data)
+    plot_graph(audio_data)
     st.write("АЧХ измененного сигнала:")
-    plot_graph(np.abs(fft_signal))
-    
+    plot_graph(out_data)
+
 # Запуск Streamlit приложения
 if __name__ == "__main__":
     st.write("Audio Signal Analyzer")
