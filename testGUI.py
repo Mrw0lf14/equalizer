@@ -9,15 +9,17 @@ def equalize(signal, start_f, end_f, koef):
     start = int(np.round(start_f / 44100 * sample_rate))
     end = int(np.round(end_f / 44100 * sample_rate))
 
-    if start >= end:
-        raise ValueError("End frequency must be greater than start frequency.")
+    # if start >= end:
+    #     raise ValueError("End frequency must be greater than start frequency.")
 
-    window_length = end - start
-    window = 1 + koef * np.hamming(window_length)
+    # window_length = end - start
+    # window = 1 + koef * np.hamming(window_length)
 
-    signal[start:end] *= window
-    signal[sample_rate - end:sample_rate - start] *= window[::-1]
-
+    # signal[start:end] *= window
+    # signal[sample_rate - end:sample_rate - start] *= window[::-1]
+    signal[start:end] *= 1 + koef
+    sample_rate = len(signal)
+    signal[sample_rate-end:sample_rate-start] *= 1 + koef
     return signal
 
 # Прямое преобразование Фурье
@@ -100,15 +102,15 @@ def fourier_transform(audio_data, slider_values):
             signal_packet = channel_data[start:start+packet_size]
             signal_packet = signal_packet.copy()  # Ensure the array is writable
             
-            windowed_packet = signal_packet * np.hanning(packet_size)
-            channel_fft = FFT(windowed_packet)
+            # windowed_packet = signal_packet * np.hanning(packet_size)
+            channel_fft = FFT(signal_packet)
             
-            equalize(channel_fft, 0, 2000, slider_values[0])
-            equalize(channel_fft, 2000, 4000, slider_values[1])
-            equalize(channel_fft, 4000, 6000, slider_values[2])
-            equalize(channel_fft, 6000, 8000, slider_values[3])
-            equalize(channel_fft, 8000, 10000, slider_values[4])
-            equalize(channel_fft, 10000, 12000, slider_values[5])
+            equalize(channel_fft, 0, 3000, slider_values[0])
+            equalize(channel_fft, 3000, 6000, slider_values[1])
+            equalize(channel_fft, 6000, 9000, slider_values[2])
+            equalize(channel_fft, 9000, 12000, slider_values[3])
+            equalize(channel_fft, 12000, 15000, slider_values[4])
+            equalize(channel_fft, 15000, 18000, slider_values[5])
             
             ifft_result = IFFT(channel_fft).real
             transformed_channel[start:start+packet_size] += ifft_result * np.hanning(packet_size)

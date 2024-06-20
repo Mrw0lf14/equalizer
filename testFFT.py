@@ -136,14 +136,14 @@ def fourier_transform2(audio_data, slider_values):
             signal_packet = signal_packet.copy()  # Ensure the array is writable
             
             windowed_packet = signal_packet * np.hanning(packet_size)
-            channel_fft = FFT(windowed_packet)
+            channel_fft = FFT(signal_packet)
             
-            equalize(channel_fft, 0, 2000, slider_values[0])
-            equalize(channel_fft, 2000, 4000, slider_values[1])
-            equalize(channel_fft, 4000, 6000, slider_values[2])
-            equalize(channel_fft, 6000, 8000, slider_values[3])
-            equalize(channel_fft, 8000, 10000, slider_values[4])
-            equalize(channel_fft, 10000, 12000, slider_values[5])
+            equalize(channel_fft, 0, 3000, slider_values[0])
+            equalize(channel_fft, 3000, 6000, slider_values[1])
+            equalize(channel_fft, 6000, 9000, slider_values[2])
+            equalize(channel_fft, 9000, 12000, slider_values[3])
+            equalize(channel_fft, 12000, 15000, slider_values[4])
+            equalize(channel_fft, 15000, 18000, slider_values[5])
             
             ifft_result = IFFT(channel_fft).real
             transformed_channel[start:start+packet_size] += ifft_result * np.hanning(packet_size)
